@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live Video Stream</title>
+  <style>
+    #video-container {
+      width: 640px;
+      height: 480px;
+      margin-bottom: 20px;
+    }
+    #device-list {
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <video id="live-video" controls autoplay muted></video>
+  <div id="device-list">
+    <label>Select Devices:</label><br>
+    <select id="devices" multiple>
+    </select>
+  </div>
+  <button id="submit-button">Submit</button>
+
+  <script>
+    const video = document.getElementById('live-video');
+    const devicesSelect = document.getElementById('devices');
+    const submitButton = document.getElementById('submit-button');
+
+    async function getMedia() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        video.srcObject = stream;
+        await populateDevices();
+      } catch (error) {
+        console.error('Error accessing media devices:', error);
+      }
+    }
+
+    async function populateDevices() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        devicesSelect.innerHTML = ''; // Clear existing options
+
+        devices.forEach(device => {
+          if (device.kind === 'videooutput' || device.kind === 'audiooutput') {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.textContent = device.label || `Device ${devicesSelect.options.length + 1}`;
+            devicesSelect.appendChild(option);
+          }
+
+        });
+      } catch (error) {
+        console.error('Error enumerating devices:', error);
+      }
+    }
+
+    submitButton.addEventListener('click', () => {
+        const selectedDevices = Array.from(devicesSelect.selectedOptions).map(option => option.value);
+        if(selectedDevices.length === 0){
+            alert("Please select at least one device");
+            return;
+        }
+        sendVideoToDevices(selectedDevices);
+    });
+
+    async function sendVideoToDevices(devices) {
+        console.log("Sending video to devices:", devices);
+        // Simulate sending video to devices (replace with actual logic)
+        //This is where the actual video sending to the devices would happen.
+        //This would likely involve server side code, webRTC or other streaming protocols.
+        //This example only logs the selected device IDs.
+        devices.forEach(deviceId => {
+            console.log("sending to device id: ", deviceId);
+            //Here, you would send the video stream to the device with deviceId.
+            //This might involve using websockets, WebRTC, or other streaming technologies.
+        });
+    }
+
+    getMedia();
+
+  </script>
+
+</body>
+</html>
