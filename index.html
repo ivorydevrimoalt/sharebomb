@@ -1,87 +1,152 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Livestream Bomber</title>
-  <style>
-    #video-container {
-      width: 640px;
-      height: 480px;
-      margin-bottom: 20px;
-    }
-    #device-list {
-      margin-bottom: 20px;
-    }
-  </style>
+    <title>Castvirus DeviceHacker</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: sans-serif;
+        }
+
+        #permissionOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #permissionOverlay button {
+            padding: 20px 40px;
+            font-size: 1.2em;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #videoContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        video {
+            max-width: 80%;
+            margin-bottom: 20px;
+        }
+
+        #castDevices {
+            display: none;
+            margin-top: 20px;
+        }
+        #castDevices select{
+            width: 300px;
+            padding: 10px;
+        }
+
+    </style>
 </head>
 <body>
+    <div id="permissionOverlay">
+        <button id="requestPermissions">Request Permissions</button>
+    </div>
 
-  <video id="live-video" controls autoplay muted></video>
-  <div id="device-list">
-    <label>Select Devices:</label><br>
-    <select id="devices" multiple>
-    </select>
-  </div>
-  <button id="submit-button">Submit</button>
+    <div id="videoContainer" style="display:none;">
+        <input type="file" id="videoInput" accept="video/*" multiple>
+        <video id="mainVideo" controls></video>
+        <button id="castButton">Cast</button>
+        <div id="castDevices">
+            <select id="deviceList" multiple></select>
+            <button id="submitCast">Submit Cast</button>
+        </div>
+    </div>
 
-  <script>
-    const video = document.getElementById('live-video');
-    const devicesSelect = document.getElementById('devices');
-    const submitButton = document.getElementById('submit-button');
+    <script>
+        const permissionOverlay = document.getElementById('permissionOverlay');
+        const requestPermissionsButton = document.getElementById('requestPermissions');
+        const videoContainer = document.getElementById('videoContainer');
+        const videoInput = document.getElementById('videoInput');
+        const mainVideo = document.getElementById('mainVideo');
+        const castButton = document.getElementById('castButton');
+        const castDevices = document.getElementById('castDevices');
+        const deviceList = document.getElementById('deviceList');
+        const submitCast = document.getElementById('submitCast');
 
-    async function getMedia() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        video.srcObject = stream;
-        await populateDevices();
-      } catch (error) {
-        console.error('Error accessing media devices:', error);
-      }
-    }
+        let castSession = null;
+        let availableDevices = [];
+        let videoFiles = [];
 
-    async function populateDevices() {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        devicesSelect.innerHTML = ''; // Clear existing options
+        requestPermissionsButton.addEventListener('click', async () => {
+            try {
+                await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                await navigator.clipboard.readText(); //permission for clipboard
+                permissionOverlay.style.display = 'none';
+                videoContainer.style.display = 'block';
 
-        devices.forEach(device => {
-          if (device.kind === 'videooutput' || device.kind === 'audiooutput') {
-            const option = document.createElement('option');
-            option.value = device.deviceId;
-            option.textContent = device.label || `Device ${devicesSelect.options.length + 1}`;
-            devicesSelect.appendChild(option);
-          }
-
+            } catch (error) {
+                console.error('Permissions denied:', error);
+                alert('Permissions denied. Please grant permissions to use this feature.');
+            }
         });
-      } catch (error) {
-        console.error('Error enumerating devices:', error);
-      }
-    }
 
-    submitButton.addEventListener('click', () => {
-        const selectedDevices = Array.from(devicesSelect.selectedOptions).map(option => option.value);
-        if(selectedDevices.length === 0){
-            alert("Please select at least one device");
-            return;
-        }
-        sendVideoToDevices(selectedDevices);
-    });
-
-    async function sendVideoToDevices(devices) {
-        console.log("Sending video to devices:", devices);
-        // Simulate sending video to devices (replace with actual logic)
-        //This is where the actual video sending to the devices would happen.
-        //This would likely involve server side code, webRTC or other streaming protocols.
-        //This example only logs the selected device IDs.
-        devices.forEach(deviceId => {
-            console.log("sending to device id: ", deviceId);
-            //Here, you would send the video stream to the device with deviceId.
-            //This might involve using websockets, WebRTC, or other streaming technologies.
+        videoInput.addEventListener('change', (event) => {
+            videoFiles = Array.from(event.target.files);
+            if (videoFiles.length > 0) {
+                const videoURL = URL.createObjectURL(videoFiles[0]);
+                mainVideo.src = videoURL;
+            }
         });
-    }
 
-    getMedia();
+        castButton.addEventListener('click', async () => {
+            try {
+                availableDevices = await navigator.mediaDevices.enumerateDevices();
+                const castableDevices = availableDevices.filter(device => device.kind === 'videooutput'); //filter for castable devices.
 
-  </script>
+                deviceList.innerHTML = '';
+                castableDevices.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.textContent = device.label || `Device ${device.deviceId}`;
+                    deviceList.appendChild(option);
+                });
 
+                castDevices.style.display = 'block';
+            } catch (error) {
+                console.error('Error enumerating devices:', error);
+                alert('Error listing devices.');
+            }
+        });
+
+        submitCast.addEventListener('click', async () => {
+            const selectedDevices = Array.from(deviceList.selectedOptions).map(option => option.value);
+
+            if (videoFiles.length === 0 || selectedDevices.length === 0) {
+                alert('Please select a video and devices to cast.');
+                return;
+            }
+
+            try {
+                selectedDevices.forEach(async (deviceId) => {
+                    const videoURL = URL.createObjectURL(videoFiles[0]);
+                    //Here you would implement the actual casting logic.
+                    //This is a placeholder as the web API for casting to arbitrary devices is not standardized.
+                    console.log(`Casting ${videoURL} to device ${deviceId}`);
+                    alert(`Casting ${videoFiles[0].name} to ${deviceId}`);
+                })
+                castDevices.style.display = 'none';
+            } catch (error) {
+                console.error('Error casting:', error);
+                alert('Error casting video.');
+            }
+        });
+
+    </script>
 </body>
 </html>
